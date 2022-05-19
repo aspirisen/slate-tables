@@ -1,6 +1,6 @@
-import { getCellColspan, createCellNode } from '../utils'
+import { getCellColspan, createCellNode } from '../core/Table'
 
-export default function decreaseColspanAtKey({ blocks }, editor, key) {
+export function decreaseColspanAt({ blocks }, editor, key) {
 	if (!editor.canDecreaseColspanAtKey(key)) return
 
 	const table = editor.getTableAtKey(key)
@@ -15,10 +15,10 @@ export default function decreaseColspanAtKey({ blocks }, editor, key) {
 		coords = coords.rest()
 
 		const lastCellsOnEveryRow = coords
-			.filter(coord => coord.x !== firstCoord.x)
-			.groupBy(coord => coord.y)
+			.filter((coord) => coord.x !== firstCoord.x)
+			.groupBy((coord) => coord.y)
 			.valueSeq()
-			.map(rowPositions => rowPositions.last())
+			.map((rowPositions) => rowPositions.last())
 
 		const { matrix } = table
 		for (const lastCoord of lastCellsOnEveryRow) {

@@ -1,92 +1,34 @@
 import { BaseRange, Editor, Node, NodeEntry, Path } from 'slate'
 import { List, Record } from 'immutable'
 import findLast from 'lodash.findlast'
-import {
-	SlateTableOptions,
-	TableCellNode,
-	TableNode,
-	TableRowNode,
-	isTableNode,
-	isTableRowNode,
-	isTableCellNode,
-	Blocks,
-	isTableNodeEntry,
-	isTableRowNodeEntry,
-	isTableCellNodeEntry
-} from 'types'
+import { TableEditor, TableNodeType } from '#core'
+import { TableNode, TableRowNode, TableCellNode } from '#nodes'
+import { Matrix, createMatrix } from './createMatrix'
 
-const Cell = Record<{ virtual: boolean; ref: TableCellNode | null }>({ virtual: false, ref: null })
-const Coordinates = Record<{ x: number | null; y: number | null }>({
-	x: null,
-	y: null
-})
+const Coordinates = Record<{ x: number; y: number }>({ x: 0, y: 0 })
 
-export const getCellColspan = (cell?: TableCellNode) => cell?.colSpan ?? 1
-export const getCellRowspan = (cell?: TableCellNode) => cell?.rowSpan ?? 1
-
-export class Table {
-	static create(options: SlateTableOptions, editor: Editor, range: BaseRange) {
-		const node = Editor.node(editor, Editor.path(editor, range))
+export class Sheet {
+	static create(editor: TableEditor, range: BaseRange) {
+		const currentNode = Editor.node(editor, Editor.path(editor, range))
 		const ancestors = Array.from(Node.ancestors(editor, Editor.path(editor, range)))
-		const allPossibleNodes = [node].concat(ancestors)
-		const tableNode = findLast(allPossibleNodes, (n) => isTableNode(n, options.blocks))
-		const rowNode = findLast(ancestors, (n) => isTableRowNode(n, options.blocks))
-		const cellNode = findLast(ancestors, (n) => isTableCellNode(n, options.blocks))
+		const allPossibleNodes = [currentNode].concat(ancestors)
+
+		const tableNodeEntry = findLast(allPossibleNodes, ([node]) => TableNode.isTableNode(editor, node))
+		const rowNodeEntry = findLast(ancestors, ([node]) => TableRowNode.isTableRowNode(editor, node))
+		const cellNodeEntry = findLast(ancestors, ([node]) => TableCellNode.isTableCellNode(editor, node))
 
 		if (
-			isTableNodeEntry(tableNode, options.blocks) &&
-			isTableRowNodeEntry(rowNode, options.blocks) &&
-			isTableRowNodeEntry(cellNode, options.blocks)
+			TableNode.isTableNodeEntry(editor, tableNodeEntry) &&
+			TableRowNode.isTableRowNodeEntry(editor, rowNodeEntry) &&
+			TableCellNode.isTableCellNodeEntry(editor, cellNodeEntry)
 		) {
-			const matrix = Table.createMatrix(tableNode[0])
+			const [tableNode] = tableNodeEntry
+			const matrix = createMatrix(tableNode)
 
-			return new Table(options, editor, tableNode, rowNode, cellNode, matrix)
+			return new Sheet(editor, tableNodeEntry, rowNodeEntry, cellNodeEntry, matrix)
 		}
 
 		return null
-	}
-
-	private static createMatrix(tableNode: TableNode) {
-		let matrix = List<List<Record<{ virtual: boolean; ref: NodeEntry<TableCellNode> | null }>>>()
-
-		const rows = tableNode.children
-		let rowIdx = 0
-
-		for (const row of rows) {
-			let colIdx = 0
-
-			if (!matrix.get(rowIdx)) {
-				matrix = matrix.set(rowIdx, List())
-			}
-
-			for (const cell of row.children) {
-				let colSpanIdx
-
-				for (let spanIdx = rowIdx; spanIdx < rowIdx + getCellRowspan(cell); spanIdx++) {
-					if (!matrix.get(spanIdx)) {
-						matrix = matrix.set(spanIdx, List())
-					}
-
-					for (colSpanIdx = 0; colSpanIdx < getCellColspan(cell); colSpanIdx++) {
-						// Insert cell at first empty position
-						let i = 0
-
-						while (matrix.get(spanIdx)?.get(colIdx + colSpanIdx + i)) {
-							i++
-						}
-
-						const fakeCell = colSpanIdx > 0 || spanIdx !== rowIdx
-						matrix = matrix.setIn([spanIdx, colIdx + colSpanIdx + i], new Cell({ ref: cell, virtual: fakeCell }))
-					}
-				}
-
-				colIdx += colSpanIdx ?? 1
-			}
-
-			rowIdx += 1
-		}
-
-		return matrix
 	}
 
 	private _prevCell: NodeEntry<TableCellNode> | undefined | null
@@ -95,12 +37,11 @@ export class Table {
 	private _cellBelow: NodeEntry<TableCellNode> | undefined | null
 
 	private constructor(
-		private options: SlateTableOptions,
-		private editor: Editor,
+		private editor: TableEditor,
 		private tableNode: NodeEntry<TableNode> | undefined,
 		private rowNode: NodeEntry<TableRowNode> | undefined,
 		private cellNode: NodeEntry<TableCellNode> | undefined,
-		private matrix: ReturnType<typeof Table['createMatrix']>
+		private matrix: Matrix
 	) {}
 
 	get table() {
@@ -137,9 +78,9 @@ export class Table {
 		const current = this.cell
 
 		if (current.node !== this.row.node.children.at(0)) {
-			this._prevCell = this.getPreviousSibling(this.editor, current.path, isTableCellNode)
+			this._prevCell = this.getPreviousSibling(this.editor, current.path, TableCellNode.isTableCellNode)
 		} else if (!this.isFirstRow()) {
-			const prevRow = this.getPreviousSibling(this.editor, this.row.path, isTableRowNode)
+			const prevRow = this.getPreviousSibling(this.editor, this.row.path, TableRowNode.isTableRowNode)
 
 			if (!prevRow) {
 				return null
@@ -147,7 +88,7 @@ export class Table {
 
 			const prevCell = Node.last(prevRow?.[0], prevRow?.[1])
 
-			if (isTableCellNodeEntry(prevCell, this.options.blocks)) {
+			if (TableCellNode.isTableCellNodeEntry(this.editor, prevCell)) {
 				this._prevCell = prevCell
 			}
 		}
@@ -279,7 +220,7 @@ export class Table {
 			cells = rows.at(0)?.children
 		}
 
-		return cells?.reduce((acc, c) => acc + getCellColspan(c), 0)
+		return cells?.reduce((acc, c) => acc + TableCellNode.getCellColspan(c), 0)
 	}
 
 	/**
@@ -289,7 +230,7 @@ export class Table {
 		const { table } = this
 		const rows = table.node.children
 
-		return rows.reduce((acc, r) => acc + getCellRowspan(r), 0)
+		return rows.reduce((acc, r) => acc + TableCellNode.getCellRowspan(r), 0)
 	}
 
 	/**
@@ -306,7 +247,7 @@ export class Table {
 		const { cell } = this
 		return List(this.row.node.children)
 			.takeUntil((c) => c === cell.node)
-			.reduce((acc, c) => acc + getCellColspan(c), 0)
+			.reduce((acc, c) => acc + TableCellNode.getCellColspan(c), 0)
 	}
 
 	/**
@@ -326,7 +267,7 @@ export class Table {
 	private getPreviousSibling<T extends Node>(
 		editor: Editor,
 		path: Path,
-		assertNode: (value: unknown, blocks: Blocks) => value is T
+		assertNode: (editor: TableEditor, value: Node | undefined) => value is T
 	): NodeEntry<T> | null {
 		let previousSiblingPath: Path
 
@@ -340,7 +281,7 @@ export class Table {
 		if (Node.has(editor, previousSiblingPath)) {
 			const node = Node.get(editor, previousSiblingPath)
 
-			if (!assertNode(node, this.options.blocks)) {
+			if (!assertNode(this.editor, node)) {
 				return null
 			}
 

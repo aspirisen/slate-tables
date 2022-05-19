@@ -1,6 +1,6 @@
-import { getCellRowspan, getCellColspan, createCellNode } from '../utils'
+import { getCellRowspan, getCellColspan, createCellNode } from '../core/Table'
 
-export default function decreaseRowspanAtKey({ blocks }, editor, key) {
+export default function decreaseRowspanAt({ blocks }, editor, key) {
 	if (!editor.canDecreaseRowspanAtKey(key)) return
 
 	const table = editor.getTableAtKey(key)
