@@ -5,12 +5,14 @@ docs
 dist
 dist-examples
 coverage
+.parcel-cache
 .babelcache
 .env
 .cache
 .npm
 .npmrc
 .idea/
+.history
 .styleguide/__tests__/__image_snapshots__/__diff_output__
 storybook_static/
 styleguide_static/

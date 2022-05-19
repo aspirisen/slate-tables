@@ -1,14 +1,7 @@
 module.exports = {
-	extends: [
-		'standard',
-		'standard-react',
-		'plugin:react/recommended',
-		'prettier',
-		'prettier/react',
-		'prettier/standard'
-	],
-	plugins: ['babel', 'prettier', 'standard', 'react', 'react-hooks'],
-	parser: 'babel-eslint',
+	extends: ['standard-react', 'plugin:react/recommended', 'prettier'],
+	plugins: ['babel', 'prettier', 'react', 'react-hooks'],
+	parser: '@babel/eslint-parser',
 	env: {
 		es6: true,
 		browser: true

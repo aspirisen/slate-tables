@@ -1,25 +1,29 @@
-import { Block, Text } from 'slate'
 import { Record, List } from 'immutable'
+import { BaseRange, Editor, Node, Transforms } from 'slate'
+import { SlateTableOptions } from 'types'
 
-export function createContentNode({ blocks }, getContent = () => [Text.create('')]) {
-	return Block.create({ type: blocks.content, nodes: getContent() })
+export function createContentNode({ blocks }, getContent = () => [{ text: '' }]) {
+	return { type: blocks.content, children: getContent() }
 }
 
 export function createCellNode({ blocks }) {
-	return Block.create({ type: blocks.cell, nodes: [createContentNode({ blocks })] })
+	return { type: blocks.cell, children: [createContentNode({ blocks })] }
 }
 
 export function createRowNode({ blocks }, count = 1) {
-	return Block.create({ type: blocks.row, nodes: Array.from(Array(count)).map(() => createCellNode({ blocks })) })
+	return {
+		type: blocks.row,
+		children: Array.from(Array(count)).map(() => createCellNode({ blocks }))
+	}
 }
 
 export function createTableNode({ blocks }, rowsCount = 2, columnsCount = 2) {
 	const rows = Array.from(Array(rowsCount)).map(() => createRowNode({ blocks }, columnsCount))
-	return Block.create({ type: blocks.table, nodes: rows })
+	return { type: blocks.table, children: rows }
 }
 
-export const getCellColspan = cell => (cell && cell.data && cell.data.get('colspan')) || 1
-export const getCellRowspan = cell => (cell && cell.data && cell.data.get('rowspan')) || 1
+export const getCellColspan = (cell) => (cell && cell.data && cell.data.get('colspan')) || 1
+export const getCellRowspan = (cell) => (cell && cell.data && cell.data.get('rowspan')) || 1
 
 const Cell = new Record({ virtual: false, ref: null })
 
@@ -68,14 +72,14 @@ export class Table extends Record({
 	contentBlock: null,
 	matrix: null
 }) {
-	static create(options, containerNode, key) {
-		const node = containerNode.getDescendant(key)
-		const ancestors = containerNode.getAncestors(key).push(node)
-		const tableBlock = ancestors.findLast(p => p.type === options.blocks.table)
-		const rowBlock = ancestors.findLast(p => p.type === options.blocks.row)
-		const cellBlock = ancestors.findLast(p => p.type === options.blocks.cell)
+	static create(options: SlateTableOptions, editor: Editor, range: BaseRange) {
+		const node = Node.get(editor, Editor.path(editor, range))
+		const ancestors = Node.ancestors(editor) containerNode.getAncestors(key).push(node)
+		const tableBlock = ancestors.findLast((p) => p.type === options.blocks.table)
+		const rowBlock = ancestors.findLast((p) => p.type === options.blocks.row)
+		const cellBlock = ancestors.findLast((p) => p.type === options.blocks.cell)
 		const contentBlock = ancestors
-			.skipUntil(ancestor => ancestor === cellBlock)
+			.skipUntil((ancestor) => ancestor === cellBlock)
 			.skip(1)
 			.first()
 
@@ -247,12 +251,12 @@ export class Table extends Record({
 		const { table, row } = this
 		const rows = table.nodes
 
-		return rows.findIndex(x => x === row)
+		return rows.findIndex((x) => x === row)
 	}
 
 	getCellStartColumn() {
 		const { cell } = this
-		return this.row.nodes.takeUntil(c => c === cell).reduce((acc, c) => acc + getCellColspan(c), 0)
+		return this.row.nodes.takeUntil((c) => c === cell).reduce((acc, c) => acc + getCellColspan(c), 0)
 	}
 
 	/**

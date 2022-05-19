@@ -1,6 +1,6 @@
 import isInTable from './isInTable'
 import isRangeInTable from './isRangeInTable'
-import getTableAtKey from './getTableAtKey'
+import getTableAtKey from './getTableAt'
 import getCellAtKey from './getCellAtKey'
 import getRowAtKey from './getRowAtKey'
 import canIncreaseColspanAtKey from './canIncreaseColspanAtKey'

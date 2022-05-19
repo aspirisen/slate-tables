@@ -3,6 +3,8 @@ import createQueries from './create-queries'
 import { isKeyHotkey } from 'is-hotkey'
 import { onTab, onEnter, onArrow, onBackspace } from './handlers'
 import { createSchema, createNormalizeNode } from './validation'
+import type { Editor } from 'slate'
+import type { ReactEditor } from 'slate-react'
 
 export const defaultOptions = {
 	blocks: {
@@ -15,15 +17,17 @@ export const defaultOptions = {
 	saveColumns: false
 }
 
-function TablePlugin(options = {}) {
+export function withTable(editor: Editor & ReactEditor, options = {}) {
 	options = {
 		...defaultOptions,
 		...options
 	}
-	return {
+
+	createCommands(options, editor);
+	createQueries(options, editor);
+
+	const save =  {
 		options,
-		commands: createCommands(options),
-		queries: createQueries(options),
 		schema: createSchema(options),
 		normalizeNode: createNormalizeNode(options),
 		onKeyDown: (event, editor, next) => {
@@ -46,6 +50,6 @@ function TablePlugin(options = {}) {
 			return next()
 		}
 	}
-}
 
-export default TablePlugin
+	return editor
+}
