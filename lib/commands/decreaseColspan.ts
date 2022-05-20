@@ -1,7 +1,9 @@
-import { getCellColspan, createCellNode } from '../core/Table'
+import { Location } from 'slate'
+import { TableEditor } from '#core'
+import { TableCellNode } from '#nodes'
 
-export function decreaseColspanAt({ blocks }, editor, key) {
-	if (!editor.canDecreaseColspanAtKey(key)) return
+export function decreaseColspan(editor: TableEditor, location: Location | null = editor.selection) {
+	if (!canDecreaseColspanAt(key)) return
 
 	const table = editor.getTableAtKey(key)
 	const { cell } = table

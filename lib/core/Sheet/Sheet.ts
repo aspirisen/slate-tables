@@ -1,16 +1,17 @@
-import { BaseRange, Editor, Node, NodeEntry, Path } from 'slate'
+import { Editor, Location, Node, NodeEntry, Path } from 'slate'
 import { List, Record } from 'immutable'
 import findLast from 'lodash.findlast'
-import { TableEditor, TableNodeType } from '#core'
+import { NodePath } from '#utils/types'
+import { TableEditor } from '#core'
 import { TableNode, TableRowNode, TableCellNode } from '#nodes'
 import { Matrix, createMatrix } from './createMatrix'
 
 const Coordinates = Record<{ x: number; y: number }>({ x: 0, y: 0 })
 
 export class Sheet {
-	static create(editor: TableEditor, range: BaseRange) {
-		const currentNode = Editor.node(editor, Editor.path(editor, range))
-		const ancestors = Array.from(Node.ancestors(editor, Editor.path(editor, range)))
+	static create(editor: TableEditor, location: Location) {
+		const currentNode = Editor.node(editor, Editor.path(editor, location))
+		const ancestors = Array.from(Node.ancestors(editor, Editor.path(editor, location)))
 		const allPossibleNodes = [currentNode].concat(ancestors)
 
 		const tableNodeEntry = findLast(allPossibleNodes, ([node]) => TableNode.isTableNode(editor, node))
@@ -22,19 +23,17 @@ export class Sheet {
 			TableRowNode.isTableRowNodeEntry(editor, rowNodeEntry) &&
 			TableCellNode.isTableCellNodeEntry(editor, cellNodeEntry)
 		) {
-			const [tableNode] = tableNodeEntry
-			const matrix = createMatrix(tableNode)
-
+			const matrix = createMatrix(editor, { node: tableNodeEntry[0], path: tableNodeEntry[1] })
 			return new Sheet(editor, tableNodeEntry, rowNodeEntry, cellNodeEntry, matrix)
 		}
 
 		return null
 	}
 
-	private _prevCell: NodeEntry<TableCellNode> | undefined | null
-	private _nextCell: NodeEntry<TableCellNode> | undefined | null
-	private _cellAbove: NodeEntry<TableCellNode> | undefined | null
-	private _cellBelow: NodeEntry<TableCellNode> | undefined | null
+	private _prevCell: NodePath<TableCellNode> | undefined
+	private _nextCell: NodePath<TableCellNode> | undefined
+	private _cellAbove: NodePath<TableCellNode> | undefined
+	private _cellBelow: NodePath<TableCellNode> | undefined
 
 	private constructor(
 		private editor: TableEditor,
@@ -44,7 +43,7 @@ export class Sheet {
 		private matrix: Matrix
 	) {}
 
-	get table() {
+	get table(): NodePath<TableNode> {
 		if (!this.tableNode) {
 			throw new Error('Not in a table')
 		}
@@ -52,7 +51,7 @@ export class Sheet {
 		return { node: this.tableNode[0], path: this.tableNode[1] }
 	}
 
-	get row() {
+	get row(): NodePath<TableRowNode> {
 		if (!this.rowNode) {
 			throw new Error('Not in a row')
 		}
@@ -60,7 +59,7 @@ export class Sheet {
 		return { node: this.rowNode[0], path: this.rowNode[1] }
 	}
 
-	get cell() {
+	get cell(): NodePath<TableCellNode> {
 		if (!this.cellNode) {
 			throw new Error('Not in a cell')
 		}
@@ -86,10 +85,10 @@ export class Sheet {
 				return null
 			}
 
-			const prevCell = Node.last(prevRow?.[0], prevRow?.[1])
+			const prevCell = Node.last(prevRow?.node, prevRow?.path)
 
 			if (TableCellNode.isTableCellNodeEntry(this.editor, prevCell)) {
-				this._prevCell = prevCell
+				this._prevCell = { node: prevCell[0], path: prevCell[1] }
 			}
 		}
 
@@ -109,8 +108,8 @@ export class Sheet {
 		}
 
 		while (matrix.has(y) && matrix.get(y)?.has(x)) {
-			if (matrix.get(y)?.get(x)?.get('ref')?.[0] !== current.node) {
-				this._nextCell = matrix.get(y)?.get(x)?.get('ref')
+			if (matrix.get(y)?.get(x)?.get('ref')?.node !== current.node) {
+				this._nextCell = matrix.get(y)?.get(x)?.get('ref') ?? undefined
 				break
 			}
 
@@ -139,8 +138,8 @@ export class Sheet {
 
 		while (y-- > 0) {
 			if (!matrix.has(y)) return
-			if (matrix.get(y)?.get(x)?.get('ref')?.[0] !== cell.node) {
-				this._cellAbove = matrix.get(y)?.get(x)?.get('ref')
+			if (matrix.get(y)?.get(x)?.get('ref')?.node !== cell.node) {
+				this._cellAbove = matrix.get(y)?.get(x)?.get('ref') ?? undefined
 				break
 			}
 		}
@@ -162,8 +161,8 @@ export class Sheet {
 
 		while (y++ < matrix.size) {
 			if (!matrix.has(y)) return
-			if (matrix.get(y)?.get(x)?.get('ref')?.[0] !== cell.node) {
-				this._cellBelow = matrix.get(y)?.get(x)?.get('ref')
+			if (matrix.get(y)?.get(x)?.get('ref')?.node !== cell.node) {
+				this._cellBelow = matrix.get(y)?.get(x)?.get('ref') ?? undefined
 				break
 			}
 		}
@@ -177,7 +176,7 @@ export class Sheet {
 
 		matrix.forEach((row, rowIdx) =>
 			row.forEach((r, colIdx) => {
-				if (r.get('ref')?.[0] === cell) {
+				if (r.get('ref')?.node === cell) {
 					coords.push(new Coordinates({ x: colIdx, y: rowIdx }))
 				}
 			})
@@ -268,26 +267,26 @@ export class Sheet {
 		editor: Editor,
 		path: Path,
 		assertNode: (editor: TableEditor, value: Node | undefined) => value is T
-	): NodeEntry<T> | null {
+	): NodePath<T> | undefined {
 		let previousSiblingPath: Path
 
 		try {
 			previousSiblingPath = Path.previous(path)
 		} catch (error) {
 			// Unable to calculate `Path.previous`, which means there is no previous sibling.
-			return null
+			return undefined
 		}
 
 		if (Node.has(editor, previousSiblingPath)) {
 			const node = Node.get(editor, previousSiblingPath)
 
 			if (!assertNode(this.editor, node)) {
-				return null
+				return undefined
 			}
 
-			return [node, previousSiblingPath]
+			return { node, path: previousSiblingPath }
 		}
 
-		return null
+		return undefined
 	}
 }

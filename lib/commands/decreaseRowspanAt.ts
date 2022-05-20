@@ -1,4 +1,4 @@
-import { getCellRowspan, getCellColspan, createCellNode } from '../core/Table'
+import { getCellRowspan, getCellColspan, createCellNode } from '../core/Sheet'
 
 export default function decreaseRowspanAt({ blocks }, editor, key) {
 	if (!editor.canDecreaseRowspanAtKey(key)) return
